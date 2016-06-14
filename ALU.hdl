@@ -1,0 +1,55 @@
+/**
+ * The ALU (Arithmetic Logic Unit).
+ * Computes one of the following functions:
+ * x+y, x-y, y-x, 0, 1, -1, x, y, -x, -y, !x, !y,
+ * x+1, y+1, x-1, y-1, x&y, x|y on two 16-bit inputs, 
+ * according to 6 input bits denoted zx,nx,zy,ny,f,no.
+ * In addition, the ALU computes two 1-bit outputs:
+ * if the ALU output == 0, zr is set to 1; otherwise zr is set to 0;
+ * if the ALU output < 0, ng is set to 1; otherwise ng is set to 0.
+ */
+
+// Implementation: the ALU logic manipulates the x and y inputs
+// and operates on the resulting values, as follows:
+// if (zx == 1) set x = 0        // 16-bit constant
+// if (nx == 1) set x = !x       // bitwise not
+// if (zy == 1) set y = 0        // 16-bit constant
+// if (ny == 1) set y = !y       // bitwise not
+// if (f == 1)  set out = x + y  // integer 2's complement addition
+// if (f == 0)  set out = x & y  // bitwise and
+// if (no == 1) set out = !out   // bitwise not
+// if (out == 0) set zr = 1
+// if (out < 0) set ng = 1
+
+CHIP ALU {
+    IN  
+        x[16], y[16],  // 16-bit inputs        
+        zx, // zero the x input?
+        nx, // negate the x input?
+        zy, // zero the y input?
+        ny, // negate the y input?
+        f,  // compute out = x + y (if 1) or x & y (if 0)
+        no; // negate the out output?
+
+    OUT 
+        out[16], // 16-bit output
+        zr, // 1 if (out == 0), 0 otherwise
+        ng; // 1 if (out < 0),  0 otherwise
+
+    PARTS:
+    Mux16(a=x, b=false, sel=zx, out=xA);
+    Mux16(a=y, b=false, sel=zy, out=yA);
+    Not16(in=xA, out=notXA);
+    Not16(in=yA, out=notYA);
+    Mux16(a=xA, b=notXA, sel=nx, out=xB);
+    Mux16(a=yA, b=notYA, sel=ny, out=yB);
+    Add16(a=xB, b=yB, out=addXY);
+    And16(a=xB, b=yB, out=andXY);
+    Mux16(a=andXY, b=addXY, sel=f, out=outA);
+    Not16(in=outA, out=notOutA);
+    Mux16(a=outA, b=notOutA, sel=no, out[15]=ng, out[0..7]=outL, out[8..15]=outH, out=out);
+    Or8Way(in=outL, out=zrA);
+    Or8Way(in=outH, out=zrB);
+    Or(a=zrA, b=zrB, out=zrC);
+    Not(in=zrC, out=zr);
+}
